@@ -2,6 +2,7 @@ const aws = require("aws-sdk");
 const fs = require("fs");
 const path = require("path");
 
+// https://docs.aws.amazon.com/AWSJavaScriptSDK/latest/AWS/S3.html
 const s3 = new aws.S3({
   endpoint: new aws.Endpoint(process.env.S3_ENDPOINT),
   accessKeyId: process.env.S3_ACCESS_KEY_ID,
@@ -12,6 +13,7 @@ const s3 = new aws.S3({
 const s3Path = process.env.S3_PATH;
 const s3Acl = process.env.S3_ACL;
 const s3Bucket = process.env.S3_BUCKET;
+const contentType = process.env.CONTENT_TYPE;
 
 var isUploading = false;
 
@@ -51,6 +53,10 @@ const uploadFile = async (fileName) => {
     
     if (s3Acl) {
       params.ACL = s3Acl;
+    }
+    
+    if (contentType) {
+      params.ContentType = contentType;
     }
 
     while (isUploading) {
