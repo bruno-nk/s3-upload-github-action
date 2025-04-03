@@ -2,38 +2,75 @@ const aws = require("aws-sdk");
 const fs = require("fs");
 const path = require("path");
 
-const spacesEndpoint = new aws.Endpoint(process.env.S3_ENDPOINT);
 const s3 = new aws.S3({
-  endpoint: spacesEndpoint,
+  endpoint: new aws.Endpoint(process.env.S3_ENDPOINT),
   accessKeyId: process.env.S3_ACCESS_KEY_ID,
   secretAccessKey: process.env.S3_SECRET_ACCESS_KEY,
+  signatureVersion: 'v4'
 });
 
-const uploadFile = (fileName) => {
-  if (fs.lstatSync(fileName).isDirectory()) {
+const s3Path = process.env.S3_PATH;
+const s3Acl = process.env.S3_ACL;
+const s3Bucket = process.env.S3_BUCKET;
+
+var isUploading = false;
+
+const sleep = (waitTimeInMs) => new Promise(resolve => setTimeout(resolve, waitTimeInMs));
+
+const uploadFile = async (fileName) => {
+  if (fileName.includes("*.")) {
+    let files = fs.readdirSync(".");
+    let filePatterns = fileName.split(",");
+    filePatterns.forEach(filePattern => {
+      let regex = new RegExp(filePattern.replace('*.', '.*\\.') + '$');
+      files.forEach(file => {
+        if (regex.test(file)) {
+          uploadFile(file);
+        }
+      });
+    });
+  }
+  else if (fs.lstatSync(fileName).isDirectory()) {
     fs.readdirSync(fileName).forEach((file) => {
       uploadFile(`${fileName}/${file}`);
     });
-  } else {
-    const fileContent = fs.readFileSync(fileName);
+  }
+  else {
+    let fileContent = fs.readFileSync(fileName);
 
-    const params = {
-      Bucket: process.env.S3_BUCKET,
-      Key: `${path.normalize(fileName)}`,
+    let s3Key = `${path.normalize(fileName)}`;    
+    if (s3Path) {
+      s3Key = `${s3Path}${s3Key}`;
+    }
+
+    let params = {
+      Bucket: s3Bucket,
+      Key: s3Key,
       Body: fileContent,
     };
     
-    const acl = process.env.S3_ACL;
-    if (acl) {
-      params.ACL = acl;
+    if (s3Acl) {
+      params.ACL = s3Acl;
     }
 
-    s3.upload(params, function (err, data) {
-      if (err) {
-        throw err;
+    while (isUploading) {
+      await sleep(100);
+      if (process.exitCode > 0) {
+        return;
       }
-      console.log(`File uploaded successful. ${data.Location}`);
-    });
+    }
+
+    isUploading = true;
+
+    try {
+      await s3.upload(params).promise();
+      console.log(`Uploaded: ${fileName} \n\tto: s3://${s3Bucket}/${s3Key}`);
+      isUploading = false;
+    }
+    catch (err) {
+      console.log(`FAILED Uploading: ${fileName} \n\tto: s3://${s3Bucket}/${s3Key} \n${err}`);
+      process.exit(1);
+    }
   }
 };
 
