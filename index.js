@@ -48,6 +48,7 @@ const uploadFile = async (fileName) => {
   }
   else {
     let fileContent = fs.readFileSync(fileName);
+    let fileSizeBytes = fileContent.length;
 
     let s3Key = `${path.normalize(fileName)}`;    
     if (s3Path) {
@@ -60,8 +61,10 @@ const uploadFile = async (fileName) => {
       Body: fileContent,
     };
     
+    let displayAcl = "private";
     if (s3Acl) {
       params.ACL = s3Acl;
+      displayAcl = `${s3Acl}`;
     }
     
     if (contentType) {
@@ -77,11 +80,15 @@ const uploadFile = async (fileName) => {
 
     isUploading = true;
 
-    console.log(`\nUploading: ${fileName} \n\t Size: ${formatBytes(fileContent.length, decimals = 1)} \n\t to: s3://${s3Bucket}/${s3Key}`);
+    console.log(`\nUploading: ${fileName} \n\t Size: ${formatBytes(fileSizeBytes, decimals = 1)} \n\t To: s3://${s3Bucket}/${s3Key} \n\t Permissions: ${displayAcl}`);
+
+    let startTime = (new Date()).getTime();
 
     try {
       let data = await s3.upload(params).promise();
-      console.log(`Completed: ${data.Location}`);
+      let uploadTimeSec = ((new Date()).getTime() - startTime) / 1000;
+      let bytesPerSecond = Math.round(fileSizeBytes / uploadTimeSec);
+      console.log(`Completed: ${data.Location} \n\t Speed: ${formatBytes(bytesPerSecond, decimals = 0)}/s`);
       isUploading = false;
     }
     catch (err) {
