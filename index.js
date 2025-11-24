@@ -14,6 +14,7 @@ const s3Path = process.env.S3_PATH;
 const s3Acl = process.env.S3_ACL;
 const s3Bucket = process.env.S3_BUCKET;
 const contentType = process.env.CONTENT_TYPE;
+const publicFiles = process.env.PUBLIC_FILES;
 
 var isUploading = false;
 
@@ -65,6 +66,10 @@ const uploadFile = async (fileName) => {
     if (s3Acl) {
       params.ACL = s3Acl;
       displayAcl = `${s3Acl}`;
+    }
+    if (typeof publicFiles === "string" && publicFiles.includes(fileName)) {
+      params.ACL = "public-read";
+      displayAcl = "public-read";
     }
     
     if (contentType) {
